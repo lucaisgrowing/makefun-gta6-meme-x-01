@@ -1,25 +1,35 @@
-// A working gta6-meme-x-01 entry (Node 22, standard library only): it copies POST.json from the repository root to
-// /output/POST.json, where the gate reads it. That is all the program has to do. The entry is the post itself: your
-// agent makes a GTA 6 meme, it is posted on X from a public account with make.fun (a link or written out) and/or a
-// tag of @makefunai and your play code in its text, POST.json names the post, and the house reads the post from X (its
-// first picture and its text) and hands that to the judge. Nothing this program writes about the post is judged.
-//
-// The POST.json this starter ships holds a placeholder address, so the gate refuses it as it stands (valid 0).
-// Replace it with your post's address before you submit.
-//
-// Outside the grader's container, MAKEFUN_BOT_DIR and MAKEFUN_OUTPUT_DIR stand in for /bot and /output:
+// GTA 6 meme entry — make.fun gta6-meme-x-01.
+// The entry is the X post itself: a GTA 6 meme (gta6-meme.jpg, generated for
+// this entry) posted from @0xm0reyu with make.fun written out, @makefunai,
+// and the play code in its text. POST.json (next to this file) names the post; this program copies it
+// to the grader's output directory, where the gate reads the post from X
+// (its first picture and its text) and hands that to the judge.
+// Locally, MAKEFUN_BOT_DIR and MAKEFUN_OUTPUT_DIR stand in for /bot and /output:
 //   mkdir -p out && MAKEFUN_BOT_DIR=. MAKEFUN_OUTPUT_DIR=out node main.ts
 
-import { copyFileSync, mkdirSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 
 const BOT_DIR = process.env.MAKEFUN_BOT_DIR ?? '/bot';
 const OUTPUT_DIR = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
 
 mkdirSync(OUTPUT_DIR, { recursive: true });
+const src = join(BOT_DIR, 'POST.json');
+const dest = join(OUTPUT_DIR, 'POST.json');
+
+let entry: { url?: string };
 try {
-  copyFileSync(join(BOT_DIR, 'POST.json'), join(OUTPUT_DIR, 'POST.json'));
+  entry = JSON.parse(readFileSync(src, 'utf8')) as { url?: string };
 } catch (err) {
-  console.error(`POST.json could not be copied from ${BOT_DIR}: ${(err as Error).message}`);
+  console.error(`POST.json could not be read from ${BOT_DIR}: ${(err as Error).message}`);
   process.exit(1);
 }
+if (!entry.url || !/^https:\/\/x\.com\/\w+\/status\/\d+$/.test(entry.url)) {
+  console.error(`POST.json holds no real post URL: ${JSON.stringify(entry)}`);
+  process.exit(1);
+}
+
+copyFileSync(src, dest);
+const digest = createHash('sha256').update(readFileSync(dest)).digest('hex').slice(0, 12);
+console.log(`POST.json -> ${dest} (${entry.url}, sha256 ${digest})`);
